@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <http:request-config name="HTTP_Request_UAA" host="localhost" port="7777" doc:name="HTTP Request Configuration"/>
+    <http:request-config name="HTTP_Request_PC" host="localhost" port="8180" doc:name="HTTP Request Configuration"/>
+    <flow name="guidewire-api-configFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="auth" allowedMethods="POST" doc:name="HTTP AUTH"/>
+        <set-payload value="#[{'grant_type':'password', 'client_id':'postman', 'client_secret':'postmansecret', 'username': 'hk', 'password' : 'gw','response_type' : 'token'}]" encoding="UTF-8" doc:name="Setting Form Parameter"/>
+        <http:request config-ref="HTTP_Request_UAA" path="oauth/token" method="POST" doc:name="HTTP">
+            <http:request-builder>
+                <http:header headerName="Content-Type" value="application/x-www-form-urlencoded"/>
+            </http:request-builder>
+        </http:request>
+    </flow>
+    <flow name="guidewire-api-configFlow1">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="pc/policy/" allowedMethods="POST" doc:name="HTTP POLICY"/>
+        <json:json-to-object-transformer returnClass="java.util.Map" doc:name="JSON to Object"/>
+        <set-variable variableName="access_token" value=" #[payload['access_token']]" doc:name="Variable"/>
+        <set-payload value="#['{&quot;id&quot;:&quot;1&quot;,&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;getAccountPolicySummaries&quot;,&quot;params&quot;:[]}']" encoding="UTF-8" doc:name="Set Payload"/>
+        <http:request config-ref="HTTP_Request_PC" path="pc/service/edge/policy/policy" method="POST" doc:name="HTTP">
+            <http:request-builder>
+                <http:header headerName="Content-Type" value="application/json"/>
+                <http:header headerName="Authorization" value="#[flowVars.access_token]"/>
+            </http:request-builder>
+        </http:request>
+        <logger level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<head>
+<style type="text/css">
+textarea {
+	width: 800px;
+	height: 500px;
+}
+
+pre {
+	outline: 1px solid #ccc;
+	padding: 5px;
+	margin: 5px;
+}
+
+.string {
+	color: green;
+}
+
+.number {
+	color: darkorange;
+}
+
+.boolean {
+	color: blue;
+}
+
+.null {
+	color: magenta;
+}
+
+.key {
+	color: red;
+}
+</style>
+
+</head>
+<body>
+	<input type="text" value="http://services-apac.skytap.com:8874/"
+		id="baseURLText" size="100"></>
+	<br />
+
+	<button onclick="doAuthentication()">Step 1 - Do
+		Authentication</button>
+	<br />
+	<button onclick="callPolicyAPI()" disabled="true" id="step2Btn">Step
+		2 - Call API</button>
+	<br />
+
+	<pre id="resultDiv"></pre>
+
+	<script type='text/javascript'>
+		var authToken;
+
+		function createXMLHttpRequest() {
+			var xmlhttp, bComplete = false;
+			try {
+				xmlhttp = new ActiveXObject("Msxml2.XMLHTTP");
+			} catch (e) {
+				try {
+					xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+				} catch (e) {
+					try {
+						xmlhttp = new XMLHttpRequest();
+					} catch (e) {
+						xmlhttp = false;
+					}
+				}
+			}
+			if (!xmlhttp)
+				return null;
+			this.connect = function(sURL, sMethod, sVars, fnDone, contentType,
+					authoToken) {
+				if (!xmlhttp)
+					return false;
+				bComplete = false;
+				sMethod = sMethod.toUpperCase();
+
+				try {
+					if (sMethod == "GET") {
+						xmlhttp.open(sMethod, sURL + "?" + sVars, true);
+						sVars = "";
+					} else {
+						xmlhttp.open(sMethod, sURL, true);
+						xmlhttp.setRequestHeader("Method", "POST " + sURL
+								+ " HTTP/1.1");
+						xmlhttp.setRequestHeader("Content-Type", contentType);
+						xmlhttp.setRequestHeader("Authorization", authoToken);
+					}
+					xmlhttp.onreadystatechange = function() {
+						if (xmlhttp.readyState == 4 && !bComplete) {
+							bComplete = true;
+							fnDone(xmlhttp);
+						}
+					};
+					xmlhttp.send(sVars);
+				} catch (z) {
+					return false;
+				}
+				return true;
+			};
+			return this;
+		}
+
+		// This is the function used to actually send the data
+		// It takes one parameter, which is an object populated with key/value pairs.
+		function doAuthentication() {
+			var baseUrl = document.getElementById('baseURLText').value;
+			var authURL = baseUrl + 'oauthToken';
+			var request = createXMLHttpRequest();
+			var urlEncodedData = "";
+			var urlEncodedDataPairs = [];
+			var authData = {
+				'grant_type' : 'password',
+				'client_id' : 'postman',
+				'client_secret' : 'postmansecret',
+				'username' : 'hk',
+				'password' : 'gw',
+				'response_type' : 'token'
+			};
+			for (name in authData) {
+				urlEncodedDataPairs.push(encodeURIComponent(name) + '='
+						+ encodeURIComponent(authData[name]));
+			}
+
+			// Combine the pairs into a single string and replace all %-encoded spaces to 
+			// the '+' character; matches the behaviour of browser form submissions.
+			urlEncodedData = urlEncodedDataPairs.join('&').replace(/%20/g, '+');
+
+			var callback = function(oXML) {
+				var response = JSON.parse(oXML.responseText);
+				authToken = response['access_token'];
+				document.getElementById("step2Btn").disabled = false;
+			}
+			request.connect(authURL, 'POST', urlEncodedData, callback,
+					'application/x-www-form-urlencoded', '');
+
+		}
+
+		function callPolicyAPI() {
+			var baseUrl = document.getElementById('baseURLText').value;
+			var policyAPIURL = baseUrl + 'pc/service/edge/policy/policy';
+			var bodyData = '{"id":"1","jsonrpc":"2.0","method":"getAccountPolicySummaries","params":[]}';
+			var request = createXMLHttpRequest();
+
+			var callback = function(oXML) {
+				var div = document.getElementById('resultDiv');
+				div.innerHTML = syntaxHighlight(JSON.stringify(JSON
+						.parse(oXML.responseText), undefined, 4));
+				document.getElementById("step2Btn").disabled = true;
+			}
+			request.connect(policyAPIURL, 'POST', bodyData, callback,
+					'application/json', "Bearer " + authToken);
+
+		}
+
+		function syntaxHighlight(json) {
+			json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
+					/>/g, '&gt;');
+			return json
+					.replace(
+							/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+							function(match) {
+								var cls = 'number';
+								if (/^"/.test(match)) {
+									if (/:$/.test(match)) {
+										cls = 'key';
+									} else {
+										cls = 'string';
+									}
+								} else if (/true|false/.test(match)) {
+									cls = 'boolean';
+								} else if (/null/.test(match)) {
+									cls = 'null';
+								}
+								return '<span class="' + cls + '">' + match
+										+ '</span>';
+							});
+		}
+	</script>
+
+</body>
+</html>
